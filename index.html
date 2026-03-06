@@ -74,7 +74,15 @@
             
             self.addEventListener('notificationclick', e => {
                 e.notification.close();
-                e.waitUntil(clients.openWindow('/'));
+                e.waitUntil(
+                    clients.matchAll({ type: 'window' }).then(windowClients => {
+                        if (windowClients.length > 0) {
+                            windowClients[0].focus();
+                        } else {
+                            clients.openWindow('/');
+                        }
+                    })
+                );
             });
         `;
         const swBlob = new Blob([swCode], { type: 'application/javascript' });
@@ -150,7 +158,7 @@
         <div id="ios-install-tooltip" class="hidden bg-blue-600 text-white text-xs font-medium p-3 flex justify-between items-center mx-4 mt-4 rounded-xl shadow-lg">
             <div class="flex items-center gap-2">
                 <i class="fa-solid fa-share text-lg"></i>
-                <span>Toque em Compartilhar e "Adicionar à Tela de Início" para instalar o App.</span>
+                <span>Toque em Compartilhar e "Adicionar à Ecrã Principal" para instalar a App (obrigatório para notificações push).</span>
             </div>
             <button onclick="this.parentElement.remove()" class="text-white/60 p-1"><i class="fa-solid fa-xmark"></i></button>
         </div>
@@ -237,7 +245,7 @@
         </main>
     </div>
 
-    <!-- MODAL DE NOTIFICAÇÕES (Conecta com Servidor em Background) -->
+    <!-- MODAL DE NOTIFICAÇÕES (Sem a chave Admin) -->
     <div id="push-modal" class="fixed inset-0 bg-black/90 z-[300] hidden items-center justify-center p-4 backdrop-blur-sm opacity-0 transition-opacity duration-300">
         <div class="glass-panel p-6 rounded-3xl w-full max-w-sm border border-slate-700 relative scale-95 transition-transform duration-300" id="push-modal-content">
             <button onclick="closePushSettings()" class="absolute top-4 right-4 text-slate-400 text-lg"><i class="fa-solid fa-xmark"></i></button>
@@ -247,14 +255,14 @@
                 </div>
                 <h3 class="text-lg font-black text-white uppercase italic tracking-tight">Ativar Notificações</h3>
                 <p class="text-[10px] text-slate-400 mt-2 font-medium leading-relaxed">
-                    Para receber alertas com o aplicativo fechado, insira a chave Admin do seu servidor. Ela será salva no seu iPhone e você não precisará digitar novamente.
+                    Ative para receber alertas no seu telemóvel mesmo quando a aplicação estiver fechada. <br><br>
+                    <span class="text-blue-400">⚠️ Importante:</span> No iPhone, isto só funciona se a app tiver sido instalada na Ecrã Principal.
                 </p>
             </div>
             
             <div class="space-y-4">
-                <input type="password" id="admin-key-input" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:border-purple-500 outline-none" placeholder="Sua ADMIN_API_KEY">
                 <button onclick="enableNotifications()" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl transition-colors text-sm uppercase tracking-wider shadow-[0_5px_15px_rgba(147,51,234,0.3)]">
-                    Emparelhar Celular
+                    Ativar Push Notifications
                 </button>
             </div>
         </div>
@@ -274,17 +282,12 @@
 
     const loginScreen = document.getElementById('login-screen');
     const dashboardScreen = document.getElementById('dashboard-screen');
-    
-    // Auto-preencher a chave Admin se ela já foi salva antes
-    const savedAdminKey = localStorage.getItem('hottrack_admin_key');
-    if (savedAdminKey) {
-        document.getElementById('admin-key-input').value = savedAdminKey;
-    }
 
     const today = new Date();
     document.getElementById('end-date').valueAsDate = today;
     document.getElementById('start-date').valueAsDate = today;
 
+    // Verificar se estamos no iOS e não estamos instalados no ecrã inicial
     function isIos() { return /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()); }
     function isInStandaloneMode() { return ('standalone' in window.navigator) && (window.navigator.standalone); }
     if (isIos() && !isInStandaloneMode()) {
@@ -342,7 +345,7 @@
 
     const formatBRL = (value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
-    // FUNÇÃO DE TOAST (Para quando o App está aberto)
+    // FUNÇÃO DE TOAST (Para quando o App está aberto no ecrã)
     function fireInAppToast(title, type) {
         const container = document.getElementById('toast-container');
         const toast = document.createElement('div');
@@ -409,8 +412,7 @@
             receita += parseFloat(item.revenue) || 0;
         });
 
-        // Dispara apenas o visual/som se estiver com a tela aberta
-        // Pois as notificações de fundo agora são feitas pelo backend (Service Worker)
+        // Dispara o alerta no painel se estiver a ver a app
         if (!isFirstLoad) {
             if (pixPagos > previousTotals.paid) {
                 fireInAppToast('💰 CAIU VENDA!', 'success');
@@ -458,7 +460,7 @@
         });
     }
 
-    // MODAL DE NOTIFICAÇÕES (Realiza o emparelhamento com o Servidor)
+    // MODAL DE NOTIFICAÇÕES (Agora usa a rota /api/sellers/...)
     function openPushSettings() {
         const modal = document.getElementById('push-modal');
         const content = document.getElementById('push-modal-content');
@@ -473,44 +475,50 @@
     }
 
     async function enableNotifications() {
-        const adminKey = document.getElementById('admin-key-input').value.trim();
-        if (!adminKey) return alert("A chave é necessária para emparelhar o iPhone com seu servidor.");
+        if (isIos() && !isInStandaloneMode()) {
+            alert('Para ativar notificações no iPhone, é obrigatório primeiro adicionar esta página à "Ecrã Principal" usando o botão Partilhar do Safari, e abri-la a partir de lá.');
+            return;
+        }
 
         try {
             const permission = await Notification.requestPermission();
-            if (permission !== 'granted') return alert('Permissão negada no sistema.');
+            if (permission !== 'granted') return alert('Permissão negada. Precisa de autorizar nas definições do dispositivo.');
             
-            if (!window.swRegistration) return alert('Aguarde o carregamento e tente novamente.');
+            if (!window.swRegistration) return alert('O serviço de fundo ainda está a carregar. Tente novamente num segundo.');
 
-            // Busca a chave pública do servidor
-            const res = await fetch(`${API_BASE_URL}/api/admin/vapidPublicKey`, { headers: { 'x-admin-api-key': adminKey } });
-            if (!res.ok) throw new Error('Chave Admin incorreta. Acesso Negado.');
+            // Busca a chave pública usando o token do utilizador (Não precisa mais de Admin Key)
+            const res = await fetch(`${API_BASE_URL}/api/sellers/vapidPublicKey`, { 
+                headers: { 'Authorization': `Bearer ${userToken}` } 
+            });
+            if (!res.ok) throw new Error('Não foi possível obter a chave de emparelhamento do servidor.');
             
             const vapidPublicKey = await res.text();
             
-            // Converte para binário (Requisito do navegador)
+            // Converte para binário
             const padding = '='.repeat((4 - vapidPublicKey.length % 4) % 4);
             const base64 = (vapidPublicKey + padding).replace(/-/g, '+').replace(/_/g, '/');
             const rawData = window.atob(base64);
             const outputArray = new Uint8Array(rawData.length);
             for (let i = 0; i < rawData.length; ++i) { outputArray[i] = rawData.charCodeAt(i); }
 
-            // Cria a inscrição no celular
+            // Inscreve o dispositivo
             const subscription = await window.swRegistration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: outputArray });
             
-            // Envia a inscrição para o servidor salvar
-            const saveRes = await fetch(`${API_BASE_URL}/api/admin/save-subscription`, {
+            // Grava a subscrição usando a nova rota do vendedor
+            const saveRes = await fetch(`${API_BASE_URL}/api/sellers/save-subscription`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-admin-api-key': adminKey },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${userToken}` 
+                },
                 body: JSON.stringify(subscription)
             });
 
             if (saveRes.ok) {
-                localStorage.setItem('hottrack_admin_key', adminKey); // Salva para você não digitar mais
-                alert('Tudo Pronto! O seu iPhone agora receberá Push Notifications do Servidor em Segundo Plano.');
+                alert('Notificações Push ativadas com sucesso! Receberá alertas mesmo com a app fechada.');
                 closePushSettings();
             } else {
-                throw new Error('Falha ao emparelhar aparelho com o servidor.');
+                throw new Error('Falha ao registar o dispositivo no servidor.');
             }
         } catch (error) {
             alert('Erro: ' + error.message);
