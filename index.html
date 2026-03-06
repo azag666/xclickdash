@@ -381,16 +381,23 @@
             receita += parseFloat(item.revenue) || 0;
         });
 
-        // Dispara o alerta no painel se estiver a ver a app
+        // Dispara o alerta no painel se estiver a ver a app (AGORA INDEPENDENTES)
         if (!isFirstLoad) {
+            let delay = 0;
+            
             if (pixPagos > previousTotals.paid) {
-                fireInAppToast('💰 CAIU VENDA!', 'success');
-            } else if (pixGerados > previousTotals.generated) {
-                fireInAppToast('⚠️ NOVO PIX GERADO', 'warning');
-            } else if (leads > previousTotals.leads) {
-                fireInAppToast('👀 NOVO LEAD', 'info');
+                setTimeout(() => fireInAppToast('💰 CAIU VENDA!', 'success'), delay);
+                delay += 1000;
+            } 
+            if (pixGerados > previousTotals.generated) {
+                setTimeout(() => fireInAppToast('⚠️ NOVO PIX GERADO', 'warning'), delay);
+                delay += 1000;
+            } 
+            if (leads > previousTotals.leads) {
+                setTimeout(() => fireInAppToast('👀 NOVO LEAD', 'info'), delay);
             }
         }
+        
         previousTotals = { leads, generated: pixGerados, paid: pixPagos };
 
         document.getElementById('sum-leads').innerText = leads;
