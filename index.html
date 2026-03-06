@@ -26,6 +26,19 @@
         
         .safe-pb { padding-bottom: env(safe-area-inset-bottom); }
         .safe-pt { padding-top: env(safe-area-inset-top); }
+
+        /* Zoom no criativo */
+        .hover-zoom {
+            transition: transform 0.2s ease-in-out;
+            z-index: 10;
+        }
+        .hover-zoom:hover {
+            transform: scale(3.5) translateY(-5px);
+            z-index: 50;
+            position: relative;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.8);
+            border-radius: 4px;
+        }
     </style>
 
     <script>
@@ -191,7 +204,7 @@
                         <table class="w-full text-left border-collapse whitespace-nowrap min-w-[600px]">
                             <thead>
                                 <tr class="bg-slate-900/60 text-[10px] uppercase tracking-widest text-slate-400">
-                                    <th class="p-3 font-black text-blue-400">Banner / Campanha</th>
+                                    <th class="p-3 font-black text-blue-400 w-32">Campanha / Banner</th>
                                     <th class="p-3 font-bold">Source</th>
                                     <th class="p-3 font-bold text-center border-l border-slate-700/50">Leads</th>
                                     <th class="p-3 font-bold text-center text-yellow-500">Ger.</th>
@@ -255,6 +268,34 @@
     const today = new Date();
     document.getElementById('end-date').valueAsDate = today;
     document.getElementById('start-date').valueAsDate = today;
+
+    // MAPA DOS CRIATIVOS (BANNER ID -> URL DA IMAGEM)
+    const creativeMapping = {
+        '4195': 'https://media.xclickads.com/f0113e14-f5d2-4f27-9260-e206551f349a/426/4195/14.png',
+        '4187': 'https://media.xclickads.com/f0113e14-f5d2-4f27-9260-e206551f349a/426/4187/ad-07.png',
+        '4185': 'https://media.xclickads.com/f0113e14-f5d2-4f27-9260-e206551f349a/426/4185/ad-05-banner.png',
+        '4189': 'https://media.xclickads.com/f0113e14-f5d2-4f27-9260-e206551f349a/426/4189/9.png',
+        '4183': 'https://media.xclickads.com/f0113e14-f5d2-4f27-9260-e206551f349a/426/4183/ad-04-banner.png',
+        '4196': 'https://media.xclickads.com/f0113e14-f5d2-4f27-9260-e206551f349a/426/4196/rectangulo1.png',
+        '4193': 'https://media.xclickads.com/f0113e14-f5d2-4f27-9260-e206551f349a/426/4193/12.png',
+        '4190': 'https://media.xclickads.com/f0113e14-f5d2-4f27-9260-e206551f349a/426/4190/9.png',
+        '4198': 'https://media.xclickads.com/f0113e14-f5d2-4f27-9260-e206551f349a/426/4198/rectangulo3.png',
+        '4181': 'https://media.xclickads.com/f0113e14-f5d2-4f27-9260-e206551f349a/426/4181/ad-03-banner.png',
+        '4192': 'https://media.xclickads.com/f0113e14-f5d2-4f27-9260-e206551f349a/426/4192/11.png',
+        '4188': 'https://media.xclickads.com/f0113e14-f5d2-4f27-9260-e206551f349a/426/4188/8.png',
+        '4191': 'https://media.xclickads.com/f0113e14-f5d2-4f27-9260-e206551f349a/426/4191/10.png',
+        '4182': 'https://media.xclickads.com/f0113e14-f5d2-4f27-9260-e206551f349a/426/4182/ad-03-native.png',
+        '4180': 'https://media.xclickads.com/f0113e14-f5d2-4f27-9260-e206551f349a/426/4180/ad-02-banner.png',
+        '4194': 'https://media.xclickads.com/f0113e14-f5d2-4f27-9260-e206551f349a/426/4194/13.png',
+        '4179': 'https://media.xclickads.com/f0113e14-f5d2-4f27-9260-e206551f349a/426/4179/ad-02-banner.png',
+        '4197': 'https://media.xclickads.com/f0113e14-f5d2-4f27-9260-e206551f349a/426/4197/rectangulo2.png',
+        '4184': 'https://media.xclickads.com/f0113e14-f5d2-4f27-9260-e206551f349a/426/4184/ad-04-native.png',
+        '4178': 'https://media.xclickads.com/f0113e14-f5d2-4f27-9260-e206551f349a/426/4178/ad-01.png',
+        '4186': 'https://media.xclickads.com/f0113e14-f5d2-4f27-9260-e206551f349a/426/4186/ad-06.png',
+        '4176': 'https://media.xclickads.com/f0113e14-f5d2-4f27-9260-e206551f349a/425/4176/banner-02.jpg',
+        '4177': 'https://media.xclickads.com/f0113e14-f5d2-4f27-9260-e206551f349a/425/4177/banner-300x100-03.jpg',
+        '4175': 'https://media.xclickads.com/f0113e14-f5d2-4f27-9260-e206551f349a/425/4175/banner-teste.jpg'
+    };
 
     // Verificar se estamos no iOS e não estamos instalados no ecrã inicial
     function isIos() { return /iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase()); }
@@ -422,10 +463,18 @@
             const bannerId = item.campaign_id || 'N/A';
             const websiteId = item.source_id || '-';
 
+            // Lógica para injetar a imagem do criativo, se existir no mapa
+            const imgElement = creativeMapping[bannerId] 
+                ? `<img src="${creativeMapping[bannerId]}" alt="Criativo ${bannerId}" class="w-10 h-auto rounded object-cover border border-slate-700 shadow-sm hover-zoom">` 
+                : `<div class="w-10 h-6 bg-slate-800 rounded border border-slate-700 flex items-center justify-center"><i class="fa-solid fa-image text-slate-600 text-[10px]"></i></div>`;
+
             const tr = document.createElement('tr');
             tr.className = 'hover:bg-slate-800/60 transition-colors';
             tr.innerHTML = `
-                <td class="p-3 font-black text-blue-400 truncate max-w-[100px]"><i class="fa-solid fa-image text-slate-600 mr-1 text-[10px]"></i> ${bannerId}</td>
+                <td class="p-3 font-black text-blue-400 flex items-center gap-3">
+                    ${imgElement}
+                    <span class="truncate">${bannerId}</span>
+                </td>
                 <td class="p-3 text-slate-300 font-mono text-[10px] truncate max-w-[80px]">${websiteId}</td>
                 <td class="p-3 text-center text-white font-medium border-l border-slate-700/50">${leads}</td>
                 <td class="p-3 text-center text-yellow-500 font-medium bg-yellow-500/5">${pixGenerated}</td>
