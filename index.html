@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel xClick Ads - HotTrack</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; }
+        .glass-panel { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .loader { border-top-color: #3b82f6; -webkit-animation: spinner 1.5s linear infinite; animation: spinner 1.5s linear infinite; }
+        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- TELA DE LOGIN -->
+    <div id="login-screen" class="flex-1 flex items-center justify-center p-4">
+        <div class="glass-panel p-8 rounded-2xl w-full max-w-md shadow-2xl relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-purple-600"></div>
+            <div class="text-center mb-8">
+                <div class="w-16 h-16 bg-blue-600/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-blue-500/30">
+                    <i class="fa-solid fa-chart-line text-blue-500 text-2xl"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-white tracking-tight">Painel de Campanhas</h1>
+                <p class="text-sm text-slate-400 mt-1">Faça login com sua conta HotTrack</p>
+            </div>
+
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">E-mail</label>
+                    <input type="email" id="email" required class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors" placeholder="seu@email.com">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Senha</label>
+                    <input type="password" id="password" required class="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors" placeholder="••••••••">
+                </div>
+                
+                <div id="login-error" class="hidden bg-red-500/10 border border-red-500/50 text-red-500 text-sm p-3 rounded-lg text-center"></div>
+
+                <button type="submit" id="btn-login" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 mt-4 shadow-lg shadow-blue-600/20">
+                    <span>Entrar no Painel</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- TELA DO DASHBOARD -->
+    <div id="dashboard-screen" class="hidden flex-1 flex-col">
+        <!-- Header -->
+        <header class="glass-panel sticky top-0 z-50 px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                    <i class="fa-solid fa-chart-pie text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold text-white leading-tight">xClick Ads Tracker</h1>
+                    <p class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold" id="user-greeting">Bem-vindo</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-3 w-full sm:w-auto">
+                <div class="flex items-center bg-slate-800 rounded-lg p-1 border border-slate-700 flex-1 sm:flex-none">
+                    <input type="date" id="start-date" class="bg-transparent text-sm text-white px-2 py-1 outline-none w-full sm:w-auto [color-scheme:dark]">
+                    <span class="text-slate-500 px-2 text-xs">até</span>
+                    <input type="date" id="end-date" class="bg-transparent text-sm text-white px-2 py-1 outline-none w-full sm:w-auto [color-scheme:dark]">
+                </div>
+                <button onclick="fetchDashboardData()" class="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg transition-colors shadow-lg shadow-blue-600/20">
+                    <i class="fa-solid fa-arrows-rotate"></i>
+                </button>
+                <button onclick="logout()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 p-2 rounded-lg border border-slate-700 transition-colors" title="Sair">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="p-6 max-w-7xl mx-auto w-full flex-1">
+            
+            <!-- Loading Indicator -->
+            <div id="loading-indicator" class="hidden py-20 flex-col items-center justify-center">
+                <div class="loader ease-linear rounded-full border-4 border-t-4 border-slate-700 h-12 w-12 mb-4"></div>
+                <p class="text-slate-400 font-medium">Buscando dados das campanhas...</p>
+            </div>
+
+            <!-- Dashboard Content -->
+            <div id="dashboard-content">
+                <!-- Resumo -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                    <div class="glass-panel p-5 rounded-xl border-l-4 border-l-blue-500">
+                        <p class="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Total de Leads</p>
+                        <h3 class="text-3xl font-black text-white" id="sum-leads">0</h3>
+                    </div>
+                    <div class="glass-panel p-5 rounded-xl border-l-4 border-l-yellow-500">
+                        <p class="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">PIX Gerados</p>
+                        <h3 class="text-3xl font-black text-white" id="sum-pix-generated">0</h3>
+                        <p class="text-[10px] text-slate-500 mt-1 font-medium" id="conversion-gerados">0% conversão lead > pix</p>
+                    </div>
+                    <div class="glass-panel p-5 rounded-xl border-l-4 border-l-green-500">
+                        <p class="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">PIX Pagos (Vendas)</p>
+                        <h3 class="text-3xl font-black text-white" id="sum-pix-paid">0</h3>
+                        <p class="text-[10px] text-slate-500 mt-1 font-medium" id="conversion-pagos">0% conversão pix > pago</p>
+                    </div>
+                    <div class="glass-panel p-5 rounded-xl border-l-4 border-l-emerald-400 relative overflow-hidden">
+                        <div class="absolute -right-4 -top-4 opacity-10 text-emerald-400 text-7xl"><i class="fa-solid fa-sack-dollar"></i></div>
+                        <p class="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Receita Total</p>
+                        <h3 class="text-3xl font-black text-emerald-400" id="sum-revenue">R$ 0,00</h3>
+                    </div>
+                </div>
+
+                <!-- Tabela de Campanhas -->
+                <div class="glass-panel rounded-xl overflow-hidden flex flex-col">
+                    <div class="px-6 py-4 border-b border-slate-700/50 flex justify-between items-center bg-slate-800/30">
+                        <h2 class="text-lg font-bold text-white"><i class="fa-solid fa-list-ol mr-2 text-blue-500"></i> Performance por Campanha (Banner)</h2>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-900/50 text-xs uppercase tracking-wider text-slate-400 border-b border-slate-700/50">
+                                    <th class="p-4 font-semibold">ID Campanha / Banner</th>
+                                    <th class="p-4 font-semibold text-center">Leads (Cliques)</th>
+                                    <th class="p-4 font-semibold text-center">Pix Gerados</th>
+                                    <th class="p-4 font-semibold text-center text-green-400">Pix Pagos</th>
+                                    <th class="p-4 font-semibold text-right text-emerald-400">Receita Bruta</th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-body" class="text-sm divide-y divide-slate-800/50">
+                                <!-- Linhas injetadas via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Empty State -->
+                    <div id="empty-state" class="hidden py-12 text-center flex-col items-center justify-center">
+                        <i class="fa-solid fa-ghost text-4xl text-slate-600 mb-3"></i>
+                        <p class="text-slate-400 font-medium">Nenhum dado encontrado para este período.</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+<script>
+    const API_BASE_URL = 'https://novaapi-one.vercel.app';
+    let userToken = localStorage.getItem('hottrack_token');
+    let userData = JSON.parse(localStorage.getItem('hottrack_user') || '{}');
+
+    // DOM Elements
+    const loginScreen = document.getElementById('login-screen');
+    const dashboardScreen = document.getElementById('dashboard-screen');
+    const loginForm = document.getElementById('login-form');
+    const loginError = document.getElementById('login-error');
+    const btnLogin = document.getElementById('btn-login');
+    
+    // Configuração de Data Padrão (Últimos 7 dias)
+    const today = new Date();
+    const lastWeek = new Date(today);
+    lastWeek.setDate(lastWeek.getDate() - 7);
+    
+    document.getElementById('end-date').valueAsDate = today;
+    document.getElementById('start-date').valueAsDate = lastWeek;
+
+    // Controle de Telas
+    function checkAuth() {
+        if (userToken) {
+            loginScreen.classList.add('hidden');
+            dashboardScreen.classList.remove('hidden');
+            dashboardScreen.classList.add('flex');
+            document.getElementById('user-greeting').innerText = userData.name ? `Olá, ${userData.name}` : 'Painel de Controle';
+            fetchDashboardData();
+        } else {
+            loginScreen.classList.remove('hidden');
+            dashboardScreen.classList.add('hidden');
+            dashboardScreen.classList.remove('flex');
+        }
+    }
+
+    // Login
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        
+        try {
+            btnLogin.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Conectando...';
+            btnLogin.disabled = true;
+            loginError.classList.add('hidden');
+
+            const res = await fetch(`${API_BASE_URL}/api/sellers/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                userToken = data.token;
+                userData = data.seller;
+                localStorage.setItem('hottrack_token', userToken);
+                localStorage.setItem('hottrack_user', JSON.stringify(userData));
+                checkAuth();
+            } else {
+                loginError.innerText = data.message || 'Erro ao fazer login.';
+                loginError.classList.remove('hidden');
+            }
+        } catch (error) {
+            loginError.innerText = 'Falha na conexão com o servidor.';
+            loginError.classList.remove('hidden');
+        } finally {
+            btnLogin.innerHTML = 'Entrar no Painel';
+            btnLogin.disabled = false;
+        }
+    });
+
+    // Logout
+    function logout() {
+        userToken = null;
+        userData = {};
+        localStorage.removeItem('hottrack_token');
+        localStorage.removeItem('hottrack_user');
+        checkAuth();
+    }
+
+    // Formatar Moeda
+    const formatBRL = (value) => {
+        return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+    };
+
+    // Buscar Dados
+    async function fetchDashboardData() {
+        const startDate = document.getElementById('start-date').value;
+        const endDate = document.getElementById('end-date').value;
+        
+        if (!startDate || !endDate) return alert('Selecione as datas!');
+
+        const loading = document.getElementById('loading-indicator');
+        const content = document.getElementById('dashboard-content');
+        const emptyState = document.getElementById('empty-state');
+        const tbody = document.getElementById('table-body');
+
+        try {
+            loading.classList.remove('hidden');
+            loading.classList.add('flex');
+            content.classList.add('hidden');
+            emptyState.classList.add('hidden');
+
+            const res = await fetch(`${API_BASE_URL}/api/dashboard/campaign-performance?startDate=${startDate}&endDate=${endDate}`, {
+                headers: { 'Authorization': `Bearer ${userToken}` }
+            });
+
+            if (res.status === 401 || res.status === 403) {
+                logout();
+                return;
+            }
+
+            const data = await res.json();
+
+            if (!Array.isArray(data) || data.length === 0) {
+                emptyState.classList.remove('hidden');
+                emptyState.classList.add('flex');
+                content.classList.remove('hidden');
+                updateSummary([]);
+                tbody.innerHTML = '';
+                return;
+            }
+
+            updateSummary(data);
+            renderTable(data);
+            
+            content.classList.remove('hidden');
+        } catch (error) {
+            console.error(error);
+            alert('Erro ao buscar dados. Tente novamente.');
+        } finally {
+            loading.classList.add('hidden');
+            loading.classList.remove('flex');
+        }
+    }
+
+    // Atualizar Cards Superiores
+    function updateSummary(data) {
+        let leads = 0, pixGerados = 0, pixPagos = 0, receita = 0;
+
+        data.forEach(item => {
+            leads += parseInt(item.total_leads) || 0;
+            pixGerados += parseInt(item.pix_generated) || 0;
+            pixPagos += parseInt(item.pix_paid) || 0;
+            receita += parseFloat(item.revenue) || 0;
+        });
+
+        document.getElementById('sum-leads').innerText = leads;
+        document.getElementById('sum-pix-generated').innerText = pixGerados;
+        document.getElementById('sum-pix-paid').innerText = pixPagos;
+        document.getElementById('sum-revenue').innerText = formatBRL(receita);
+
+        // Calcular conversões
+        const convGerados = leads > 0 ? ((pixGerados / leads) * 100).toFixed(1) : 0;
+        const convPagos = pixGerados > 0 ? ((pixPagos / pixGerados) * 100).toFixed(1) : 0;
+
+        document.getElementById('conversion-gerados').innerText = `${convGerados}% converteram de Lead para Pix`;
+        document.getElementById('conversion-pagos').innerText = `${convPagos}% pagaram o Pix gerado`;
+    }
+
+    // Renderizar Tabela
+    function renderTable(data) {
+        const tbody = document.getElementById('table-body');
+        tbody.innerHTML = '';
+
+        data.forEach(item => {
+            const revenue = parseFloat(item.revenue) || 0;
+            const leads = parseInt(item.total_leads) || 0;
+            const pixGenerated = parseInt(item.pix_generated) || 0;
+            const pixPaid = parseInt(item.pix_paid) || 0;
+            const campaignName = item.campaign_id || 'Orgânico / Direto';
+
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-slate-800/40 transition-colors group';
+            tr.innerHTML = `
+                <td class="p-4 font-medium text-white flex items-center gap-3">
+                    <div class="w-8 h-8 rounded bg-slate-800 border border-slate-700 flex items-center justify-center text-xs text-slate-400 group-hover:bg-blue-600/20 group-hover:text-blue-400 group-hover:border-blue-500/30 transition-colors">
+                        <i class="fa-solid fa-tag"></i>
+                    </div>
+                    ${campaignName}
+                </td>
+                <td class="p-4 text-center text-slate-300 font-medium">${leads}</td>
+                <td class="p-4 text-center text-slate-300 font-medium">${pixGenerated}</td>
+                <td class="p-4 text-center text-green-400 font-bold bg-green-500/5">${pixPaid}</td>
+                <td class="p-4 text-right text-emerald-400 font-black">${formatBRL(revenue)}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // Init
+    checkAuth();
+</script>
+</body>
+</html>
