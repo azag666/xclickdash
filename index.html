@@ -48,10 +48,30 @@
             document.getElementById('manifest-link').href = URL.createObjectURL(manifestBlob);
         });
 
-        // SERVICE WORKER SIMPLIFICADO
+        // SERVICE WORKER COM SUPORTE A PUSH DE SEGUNDO PLANO
         const swCode = `
             self.addEventListener('install', e => self.skipWaiting());
             self.addEventListener('activate', e => self.clients.claim());
+            
+            // Ouve as mensagens diretas do seu servidor!
+            self.addEventListener('push', e => {
+                let data = { title: 'xClick Tracker', body: 'Nova atualização!' };
+                if (e.data) {
+                    try {
+                        data = e.data.json();
+                    } catch (err) {
+                        data.body = e.data.text();
+                    }
+                }
+                e.waitUntil(
+                    self.registration.showNotification(data.title, {
+                        body: data.body,
+                        icon: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjExNSIgZmlsbD0iIzNiODJmNiIvPjxwYXRoIGQ9Ik0yNTYgMTQ0YTExMiAxMTIgMCAxMDAgMjI0IDExMiAxMTIgMCAwMDAtMjI0em0wIDE3NmE2NCA2NCAwIDExMC0xMjggNjQgNjQgMCAwMTAgMTI4eiIgZmlsbD0iI2ZmZiIvPjwvc3ZnPg==',
+                        badge: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjExNSIgZmlsbD0iIzNiODJmNiIvPjxwYXRoIGQ9Ik0yNTYgMTQ0YTExMiAxMTIgMCAxMDAgMjI0IDExMiAxMTIgMCAwMDAtMjI0em0wIDE3NmE2NCA2NCAwIDExMC0xMjggNjQgNjQgMCAwMTAgMTI4eiIgZmlsbD0iI2ZmZiIvPjwvc3ZnPg=='
+                    })
+                );
+            });
+            
             self.addEventListener('notificationclick', e => {
                 e.notification.close();
                 e.waitUntil(clients.openWindow('/'));
@@ -59,13 +79,15 @@
         `;
         const swBlob = new Blob([swCode], { type: 'application/javascript' });
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register(URL.createObjectURL(swBlob));
+            navigator.serviceWorker.register(URL.createObjectURL(swBlob)).then(reg => {
+                window.swRegistration = reg;
+            });
         }
     </script>
 </head>
 <body class="min-h-screen flex flex-col bg-[#0f172a] safe-pt">
 
-    <!-- TOAST CONTAINER -->
+    <!-- TOAST CONTAINER (Para quando o App estiver aberto) -->
     <div id="toast-container" class="fixed top-4 left-0 right-0 z-[200] flex flex-col items-center gap-2 px-4 pointer-events-none"></div>
 
     <!-- TELA DE LOGIN -->
@@ -215,7 +237,7 @@
         </main>
     </div>
 
-    <!-- MODAL DE NOTIFICAÇÕES (Sem necessidade de API Key) -->
+    <!-- MODAL DE NOTIFICAÇÕES (Conecta com Servidor em Background) -->
     <div id="push-modal" class="fixed inset-0 bg-black/90 z-[300] hidden items-center justify-center p-4 backdrop-blur-sm opacity-0 transition-opacity duration-300">
         <div class="glass-panel p-6 rounded-3xl w-full max-w-sm border border-slate-700 relative scale-95 transition-transform duration-300" id="push-modal-content">
             <button onclick="closePushSettings()" class="absolute top-4 right-4 text-slate-400 text-lg"><i class="fa-solid fa-xmark"></i></button>
@@ -223,14 +245,18 @@
                 <div class="w-14 h-14 bg-purple-600/20 rounded-full flex items-center justify-center mx-auto mb-3">
                     <i class="fa-solid fa-bell text-purple-400 text-2xl"></i>
                 </div>
-                <h3 class="text-lg font-black text-white uppercase italic tracking-tight">Ativar Alertas</h3>
+                <h3 class="text-lg font-black text-white uppercase italic tracking-tight">Ativar Notificações</h3>
                 <p class="text-[10px] text-slate-400 mt-2 font-medium leading-relaxed">
-                    Permita as notificações no seu aparelho. Manter a app aberta ativará o alerta sonoro e as notificações no topo da tela sempre que houver conversão.
+                    Para receber alertas com o aplicativo fechado, insira a chave Admin do seu servidor. Ela será salva no seu iPhone e você não precisará digitar novamente.
                 </p>
             </div>
-            <button onclick="enableNotifications()" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl transition-colors text-sm uppercase tracking-wider shadow-[0_5px_15px_rgba(147,51,234,0.3)]">
-                Permitir Notificações
-            </button>
+            
+            <div class="space-y-4">
+                <input type="password" id="admin-key-input" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:border-purple-500 outline-none" placeholder="Sua ADMIN_API_KEY">
+                <button onclick="enableNotifications()" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl transition-colors text-sm uppercase tracking-wider shadow-[0_5px_15px_rgba(147,51,234,0.3)]">
+                    Emparelhar Celular
+                </button>
+            </div>
         </div>
     </div>
 
@@ -249,6 +275,12 @@
     const loginScreen = document.getElementById('login-screen');
     const dashboardScreen = document.getElementById('dashboard-screen');
     
+    // Auto-preencher a chave Admin se ela já foi salva antes
+    const savedAdminKey = localStorage.getItem('hottrack_admin_key');
+    if (savedAdminKey) {
+        document.getElementById('admin-key-input').value = savedAdminKey;
+    }
+
     const today = new Date();
     document.getElementById('end-date').valueAsDate = today;
     document.getElementById('start-date').valueAsDate = today;
@@ -310,9 +342,8 @@
 
     const formatBRL = (value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
-    // FUNÇÃO QUE DISPARA NOTIFICAÇÕES (Toast, Áudio e Notificação do Aparelho)
-    function fireNotification(title, message, type) {
-        // 1. Mostrar Toast na tela
+    // FUNÇÃO DE TOAST (Para quando o App está aberto)
+    function fireInAppToast(title, type) {
         const container = document.getElementById('toast-container');
         const toast = document.createElement('div');
         const colors = { 'success': 'bg-green-600', 'warning': 'bg-yellow-500', 'info': 'bg-blue-600' };
@@ -328,16 +359,7 @@
             setTimeout(() => toast.remove(), 300);
         }, 4000);
 
-        // 2. Tocar Som
         document.getElementById('alert-sound').play().catch(()=>{});
-
-        // 3. Notificação do Sistema (Se permitido)
-        if (Notification.permission === 'granted') {
-            new Notification(title, { 
-                body: message,
-                icon: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjExNSIgZmlsbD0iIzNiODJmNiIvPjxwYXRoIGQ9Ik0yNTYgMTQ0YTExMiAxMTIgMCAxMDAgMjI0IDExMiAxMTIgMCAwMDAtMjI0em0wIDE3NmE2NCA2NCAwIDExMC0xMjggNjQgNjQgMCAwMTAgMTI4eiIgZmlsbD0iI2ZmZiIvPjwvc3ZnPg=='
-            });
-        }
     }
 
     async function manualRefresh() {
@@ -387,14 +409,15 @@
             receita += parseFloat(item.revenue) || 0;
         });
 
-        // Verifica novos dados e aciona os alertas
+        // Dispara apenas o visual/som se estiver com a tela aberta
+        // Pois as notificações de fundo agora são feitas pelo backend (Service Worker)
         if (!isFirstLoad) {
             if (pixPagos > previousTotals.paid) {
-                fireNotification('💰 CAIU VENDA!', 'Um novo PIX foi pago com sucesso!', 'success');
+                fireInAppToast('💰 CAIU VENDA!', 'success');
             } else if (pixGerados > previousTotals.generated) {
-                fireNotification('⚠️ NOVO PIX GERADO', 'Alguém gerou um PIX, aguardando pagamento.', 'warning');
+                fireInAppToast('⚠️ NOVO PIX GERADO', 'warning');
             } else if (leads > previousTotals.leads) {
-                fireNotification('👀 NOVO LEAD', 'Novo clique registado na campanha.', 'info');
+                fireInAppToast('👀 NOVO LEAD', 'info');
             }
         }
         previousTotals = { leads, generated: pixGerados, paid: pixPagos };
@@ -435,7 +458,7 @@
         });
     }
 
-    // MODAL DE NOTIFICAÇÕES (Local)
+    // MODAL DE NOTIFICAÇÕES (Realiza o emparelhamento com o Servidor)
     function openPushSettings() {
         const modal = document.getElementById('push-modal');
         const content = document.getElementById('push-modal-content');
@@ -450,18 +473,44 @@
     }
 
     async function enableNotifications() {
-        if (!("Notification" in window)) {
-            alert("Este navegador não suporta notificações.");
-            return;
-        }
-        
+        const adminKey = document.getElementById('admin-key-input').value.trim();
+        if (!adminKey) return alert("A chave é necessária para emparelhar o iPhone com seu servidor.");
+
         try {
             const permission = await Notification.requestPermission();
-            if (permission === 'granted') {
-                alert('Notificações ativadas! Mantenha o site aberto para receber alertas.');
+            if (permission !== 'granted') return alert('Permissão negada no sistema.');
+            
+            if (!window.swRegistration) return alert('Aguarde o carregamento e tente novamente.');
+
+            // Busca a chave pública do servidor
+            const res = await fetch(`${API_BASE_URL}/api/admin/vapidPublicKey`, { headers: { 'x-admin-api-key': adminKey } });
+            if (!res.ok) throw new Error('Chave Admin incorreta. Acesso Negado.');
+            
+            const vapidPublicKey = await res.text();
+            
+            // Converte para binário (Requisito do navegador)
+            const padding = '='.repeat((4 - vapidPublicKey.length % 4) % 4);
+            const base64 = (vapidPublicKey + padding).replace(/-/g, '+').replace(/_/g, '/');
+            const rawData = window.atob(base64);
+            const outputArray = new Uint8Array(rawData.length);
+            for (let i = 0; i < rawData.length; ++i) { outputArray[i] = rawData.charCodeAt(i); }
+
+            // Cria a inscrição no celular
+            const subscription = await window.swRegistration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: outputArray });
+            
+            // Envia a inscrição para o servidor salvar
+            const saveRes = await fetch(`${API_BASE_URL}/api/admin/save-subscription`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-admin-api-key': adminKey },
+                body: JSON.stringify(subscription)
+            });
+
+            if (saveRes.ok) {
+                localStorage.setItem('hottrack_admin_key', adminKey); // Salva para você não digitar mais
+                alert('Tudo Pronto! O seu iPhone agora receberá Push Notifications do Servidor em Segundo Plano.');
                 closePushSettings();
             } else {
-                alert('Permissão negada. Permita as notificações nas definições do seu navegador.');
+                throw new Error('Falha ao emparelhar aparelho com o servidor.');
             }
         } catch (error) {
             alert('Erro: ' + error.message);
