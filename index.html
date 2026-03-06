@@ -87,8 +87,13 @@
         `;
         const swBlob = new Blob([swCode], { type: 'application/javascript' });
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register(URL.createObjectURL(swBlob)).then(reg => {
+            navigator.serviceWorker.register(URL.createObjectURL(swBlob))
+            .then(reg => {
+                console.log('Service Worker Registado com sucesso.');
                 window.swRegistration = reg;
+            })
+            .catch(err => {
+                console.error('Falha ao registar o Service Worker:', err);
             });
         }
     </script>
@@ -245,7 +250,7 @@
         </main>
     </div>
 
-    <!-- MODAL DE NOTIFICAÇÕES (Sem a chave Admin) -->
+    <!-- MODAL DE NOTIFICAÇÕES -->
     <div id="push-modal" class="fixed inset-0 bg-black/90 z-[300] hidden items-center justify-center p-4 backdrop-blur-sm opacity-0 transition-opacity duration-300">
         <div class="glass-panel p-6 rounded-3xl w-full max-w-sm border border-slate-700 relative scale-95 transition-transform duration-300" id="push-modal-content">
             <button onclick="closePushSettings()" class="absolute top-4 right-4 text-slate-400 text-lg"><i class="fa-solid fa-xmark"></i></button>
@@ -460,7 +465,7 @@
         });
     }
 
-    // MODAL DE NOTIFICAÇÕES (Agora usa a rota /api/sellers/...)
+    // MODAL DE NOTIFICAÇÕES (Agora aguarda o SW ficar pronto oficialmente)
     function openPushSettings() {
         const modal = document.getElementById('push-modal');
         const content = document.getElementById('push-modal-content');
@@ -476,35 +481,39 @@
 
     async function enableNotifications() {
         if (isIos() && !isInStandaloneMode()) {
-            alert('Para ativar notificações no iPhone, é obrigatório primeiro adicionar esta página à "Ecrã Principal" usando o botão Partilhar do Safari, e abri-la a partir de lá.');
+            alert('Para ativar notificações no iPhone, tem de adicionar esta página ao Ecrã Principal (botão Partilhar do Safari) e abri-la a partir de lá.');
             return;
         }
 
         try {
             const permission = await Notification.requestPermission();
-            if (permission !== 'granted') return alert('Permissão negada. Precisa de autorizar nas definições do dispositivo.');
+            if (permission !== 'granted') return alert('Permissão negada. Autorize nas definições do seu telemóvel.');
             
-            if (!window.swRegistration) return alert('O serviço de fundo ainda está a carregar. Tente novamente num segundo.');
+            // Correção aqui: Espera oficialmente pelo registo completo do Service Worker
+            let swReg = window.swRegistration;
+            if (!swReg) {
+                swReg = await navigator.serviceWorker.ready;
+            }
 
-            // Busca a chave pública usando o token do utilizador (Não precisa mais de Admin Key)
+            if (!swReg) {
+                return alert('O Safari do iPhone requer que a aplicação esteja a correr a partir do Ecrã Principal para suportar notificações em segundo plano.');
+            }
+
             const res = await fetch(`${API_BASE_URL}/api/sellers/vapidPublicKey`, { 
                 headers: { 'Authorization': `Bearer ${userToken}` } 
             });
-            if (!res.ok) throw new Error('Não foi possível obter a chave de emparelhamento do servidor.');
+            if (!res.ok) throw new Error('Não foi possível ligar ao servidor de notificações.');
             
             const vapidPublicKey = await res.text();
             
-            // Converte para binário
             const padding = '='.repeat((4 - vapidPublicKey.length % 4) % 4);
             const base64 = (vapidPublicKey + padding).replace(/-/g, '+').replace(/_/g, '/');
             const rawData = window.atob(base64);
             const outputArray = new Uint8Array(rawData.length);
             for (let i = 0; i < rawData.length; ++i) { outputArray[i] = rawData.charCodeAt(i); }
 
-            // Inscreve o dispositivo
-            const subscription = await window.swRegistration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: outputArray });
+            const subscription = await swReg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: outputArray });
             
-            // Grava a subscrição usando a nova rota do vendedor
             const saveRes = await fetch(`${API_BASE_URL}/api/sellers/save-subscription`, {
                 method: 'POST',
                 headers: { 
@@ -515,13 +524,14 @@
             });
 
             if (saveRes.ok) {
-                alert('Notificações Push ativadas com sucesso! Receberá alertas mesmo com a app fechada.');
+                alert('Feito! O seu telemóvel agora vai receber notificações reais mesmo com a app fechada.');
                 closePushSettings();
             } else {
-                throw new Error('Falha ao registar o dispositivo no servidor.');
+                throw new Error('O servidor rejeitou o registo do dispositivo.');
             }
         } catch (error) {
-            alert('Erro: ' + error.message);
+            console.error(error);
+            alert('Erro ao ativar: ' + error.message);
         }
     }
 
