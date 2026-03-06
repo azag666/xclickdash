@@ -31,10 +31,3 @@ self.addEventListener('notificationclick', e => {
         })
     );
 });
-
-**Resumo dos passos para funcionar no iPhone:**
-1. Atualize o `dashboard-pwa.html` no seu alojamento.
-2. Crie e faça upload do ficheiro `sw.js` para a mesma pasta.
-3. Abra a página no Safari.
-4. Clique em Partilhar -> **Adicionar ao Ecrã Principal**.
-5. Abra a "App" que foi criada no seu telemóvel, faça login e clique no botão das notificações para ativar!
