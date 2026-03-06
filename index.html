@@ -77,12 +77,12 @@
         </header>
 
         <!-- Main Content -->
-        <main class="p-6 max-w-7xl mx-auto w-full flex-1">
+        <main class="p-6 max-w-[1400px] mx-auto w-full flex-1">
             
             <!-- Loading Indicator -->
             <div id="loading-indicator" class="hidden py-20 flex-col items-center justify-center">
                 <div class="loader ease-linear rounded-full border-4 border-t-4 border-slate-700 h-12 w-12 mb-4"></div>
-                <p class="text-slate-400 font-medium">Buscando dados das campanhas...</p>
+                <p class="text-slate-400 font-medium">Buscando dados detalhados...</p>
             </div>
 
             <!-- Dashboard Content -->
@@ -110,20 +110,23 @@
                     </div>
                 </div>
 
-                <!-- Tabela de Campanhas -->
+                <!-- Tabela de Campanhas Detalhada -->
                 <div class="glass-panel rounded-xl overflow-hidden flex flex-col">
                     <div class="px-6 py-4 border-b border-slate-700/50 flex justify-between items-center bg-slate-800/30">
-                        <h2 class="text-lg font-bold text-white"><i class="fa-solid fa-list-ol mr-2 text-blue-500"></i> Performance por Campanha (Banner)</h2>
+                        <h2 class="text-lg font-bold text-white"><i class="fa-solid fa-layer-group mr-2 text-blue-500"></i> Relatório Detalhado xClick</h2>
                     </div>
                     <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse">
+                        <table class="w-full text-left border-collapse whitespace-nowrap">
                             <thead>
                                 <tr class="bg-slate-900/50 text-xs uppercase tracking-wider text-slate-400 border-b border-slate-700/50">
-                                    <th class="p-4 font-semibold">ID Campanha / Banner</th>
-                                    <th class="p-4 font-semibold text-center">Leads (Cliques)</th>
-                                    <th class="p-4 font-semibold text-center">Pix Gerados</th>
-                                    <th class="p-4 font-semibold text-center text-green-400">Pix Pagos</th>
-                                    <th class="p-4 font-semibold text-right text-emerald-400">Receita Bruta</th>
+                                    <th class="p-4 font-semibold text-blue-400">Banner ID <br><span class="text-[9px] text-slate-500">(utm_campaign)</span></th>
+                                    <th class="p-4 font-semibold">Website ID <br><span class="text-[9px] text-slate-500">(utm_source)</span></th>
+                                    <th class="p-4 font-semibold">Zone ID <br><span class="text-[9px] text-slate-500">(utm_medium)</span></th>
+                                    <th class="p-4 font-semibold">Page URL <br><span class="text-[9px] text-slate-500">(utm_content)</span></th>
+                                    <th class="p-4 font-semibold text-center border-l border-slate-700/50">Leads</th>
+                                    <th class="p-4 font-semibold text-center text-yellow-500">Gerados</th>
+                                    <th class="p-4 font-semibold text-center text-green-400">Pagos</th>
+                                    <th class="p-4 font-semibold text-right text-emerald-400">Receita</th>
                                 </tr>
                             </thead>
                             <tbody id="table-body" class="text-sm divide-y divide-slate-800/50">
@@ -154,7 +157,7 @@
     const loginError = document.getElementById('login-error');
     const btnLogin = document.getElementById('btn-login');
     
-    // Configuração de Data Padrão (Últimos 7 dias)
+    // Configuração de Data Padrão
     const today = new Date();
     const lastWeek = new Date(today);
     lastWeek.setDate(lastWeek.getDate() - 7);
@@ -224,7 +227,6 @@
         checkAuth();
     }
 
-    // Formatar Moeda
     const formatBRL = (value) => {
         return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
     };
@@ -296,7 +298,6 @@
         document.getElementById('sum-pix-paid').innerText = pixPagos;
         document.getElementById('sum-revenue').innerText = formatBRL(receita);
 
-        // Calcular conversões
         const convGerados = leads > 0 ? ((pixGerados / leads) * 100).toFixed(1) : 0;
         const convPagos = pixGerados > 0 ? ((pixPagos / pixGerados) * 100).toFixed(1) : 0;
 
@@ -304,7 +305,7 @@
         document.getElementById('conversion-pagos').innerText = `${convPagos}% pagaram o Pix gerado`;
     }
 
-    // Renderizar Tabela
+    // Renderizar Tabela com Todas as Colunas
     function renderTable(data) {
         const tbody = document.getElementById('table-body');
         tbody.innerHTML = '';
@@ -314,19 +315,30 @@
             const leads = parseInt(item.total_leads) || 0;
             const pixGenerated = parseInt(item.pix_generated) || 0;
             const pixPaid = parseInt(item.pix_paid) || 0;
-            const campaignName = item.campaign_id || 'Orgânico / Direto';
+            
+            // Valores que virão do novo backend
+            const bannerId = item.campaign_id || 'N/A';
+            const websiteId = item.source_id || 'N/A';
+            const zoneId = item.zone_id || 'N/A';
+            const pageUrl = item.page_url || 'N/A';
 
             const tr = document.createElement('tr');
             tr.className = 'hover:bg-slate-800/40 transition-colors group';
             tr.innerHTML = `
-                <td class="p-4 font-medium text-white flex items-center gap-3">
-                    <div class="w-8 h-8 rounded bg-slate-800 border border-slate-700 flex items-center justify-center text-xs text-slate-400 group-hover:bg-blue-600/20 group-hover:text-blue-400 group-hover:border-blue-500/30 transition-colors">
-                        <i class="fa-solid fa-tag"></i>
-                    </div>
-                    ${campaignName}
+                <td class="p-4 font-bold text-blue-400 flex items-center gap-2">
+                    <i class="fa-solid fa-image text-slate-500 text-xs"></i> ${bannerId}
                 </td>
-                <td class="p-4 text-center text-slate-300 font-medium">${leads}</td>
-                <td class="p-4 text-center text-slate-300 font-medium">${pixGenerated}</td>
+                <td class="p-4 text-slate-300 font-mono text-xs">
+                    ${websiteId !== 'N/A' ? websiteId : '<span class="text-slate-600">-</span>'}
+                </td>
+                <td class="p-4 text-slate-300 font-mono text-xs">
+                    ${zoneId !== 'N/A' ? zoneId : '<span class="text-slate-600">-</span>'}
+                </td>
+                <td class="p-4 text-slate-400 text-xs max-w-[150px] truncate" title="${pageUrl}">
+                    ${pageUrl !== 'N/A' ? pageUrl : '<span class="text-slate-600">-</span>'}
+                </td>
+                <td class="p-4 text-center text-white font-medium border-l border-slate-700/50">${leads}</td>
+                <td class="p-4 text-center text-yellow-500 font-medium">${pixGenerated}</td>
                 <td class="p-4 text-center text-green-400 font-bold bg-green-500/5">${pixPaid}</td>
                 <td class="p-4 text-right text-emerald-400 font-black">${formatBRL(revenue)}</td>
             `;
